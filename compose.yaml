@@ -1,0 +1,39 @@
+name: oficina-catalogo-servico
+
+services:
+  mongo:
+    image: mongo:8.0
+    ports:
+      - "127.0.0.1:27018:27017"
+    volumes:
+      - servicos_mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand({ping: 1}).ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build: .
+    ports:
+      - "127.0.0.1:8083:8083"
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      MONGODB_URI: mongodb://mongo:27017/oficina_servicos_db
+      CATALOGO_SERVICO_API_KEY: ${CATALOGO_SERVICO_API_KEY:-servico-local-key}
+    networks:
+      default:
+      dinoco:
+        aliases:
+          - catalogo-servico-api
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+networks:
+  dinoco:
+    external: true
+    name: dinoco-local
+
+volumes:
+  servicos_mongo_data:

@@ -1,0 +1,3 @@
+catalogo:
+  security:
+    api-key: ${CATALOGO_SERVICO_API_KEY:servico-local-key}
