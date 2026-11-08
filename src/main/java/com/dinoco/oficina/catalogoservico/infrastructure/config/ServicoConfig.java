@@ -1,5 +1,6 @@
 package com.dinoco.oficina.catalogoservico.infrastructure.config;
 
+import com.dinoco.oficina.catalogoservico.application.usecases.queries.buscarporid.BuscarServicosPorIdsHandler;
 import com.dinoco.oficina.catalogoservico.adapters.controllers.ServicoControllerClean;
 import com.dinoco.oficina.catalogoservico.application.gateways.ServicoCommandGateway;
 import com.dinoco.oficina.catalogoservico.application.gateways.ServicoQueryGateway;
@@ -44,5 +45,11 @@ public class ServicoConfig {
             DesativarServicoUseCase desativarServicoUseCase,
             BuscarServicoPorIdUseCase buscarServicoPorIdUseCase) {
         return new ServicoControllerClean(criarServicoUseCase, atualizarServicoUseCase, desativarServicoUseCase, buscarServicoPorIdUseCase);
+    }
+
+    @Bean
+    public BuscarServicosPorIdsHandler buscarServicosPorIds(
+            ServicoQueryGateway gateway) {
+        return new BuscarServicosPorIdsHandler(gateway);
     }
 }

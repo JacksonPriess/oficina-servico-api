@@ -18,6 +18,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import java.net.URI;
+import java.util.List;
+import com.dinoco.oficina.catalogoservico.application.usecases.queries.buscarporid.BuscarServicosPorIdsHandler;
 
 @Tag(name = "6. Serviços", description = "Cadastro de serviço")
 @RestController
@@ -27,9 +29,13 @@ public class ServicoSpringWebController {
     private final ServicoControllerClean controllerClean;
     private final ServicoWebMapper mapper;
 
-    public ServicoSpringWebController(ServicoControllerClean controllerClean, ServicoWebMapper mapper) {
+    private final BuscarServicosPorIdsHandler buscarServicosPorIds;
+
+    public ServicoSpringWebController(ServicoControllerClean controllerClean, ServicoWebMapper mapper,
+                                       BuscarServicosPorIdsHandler buscarServicosPorIds) {
         this.controllerClean = controllerClean;
         this.mapper = mapper;
+        this.buscarServicosPorIds = buscarServicosPorIds;
     }
 
     @Operation(summary = "Cadastrar serviço")
@@ -62,6 +68,12 @@ public class ServicoSpringWebController {
         DesativarServicoCommand command = mapper.toDesativarCommand(id);
         controllerClean.desativarServico(command);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Buscar serviços em lote, incluindo desativados")
+    @GetMapping(params = "ids")
+    public List<ServicoResponseDto> buscarPorIds(@RequestParam List<Long> ids) {
+        return buscarServicosPorIds.executar(ids).stream().map(mapper::toQueryResponse).toList();
     }
 
     @Operation(summary = "Buscar serviço por código")
