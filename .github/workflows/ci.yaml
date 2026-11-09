@@ -33,3 +33,41 @@ jobs:
           cache: maven
       - name: Testar e empacotar catálogo
         run: sh mvnw -B verify
+
+  deploy:
+    needs: testes
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: catalogo-servico-eks-dev
+      cancel-in-progress: false
+    env:
+      AWS_REGION: us-east-1
+      EKS_CLUSTER_NAME: oficina-api-dev-cluster
+      ECR_REPOSITORY: oficina-servico-dev-repo
+      K8S_NAMESPACE: default
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configurar credenciais AWS
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Login no Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Publicar imagem no ECR
+        env:
+          DOCKER_IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+        run: |
+          docker build -t "$DOCKER_IMAGE" .
+          docker push "$DOCKER_IMAGE"
+      - name: Configurar acesso ao EKS
+        run: aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+      - name: Publicar catálogo de serviços
+        env:
+          DOCKER_IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          CATALOGO_SERVICO_API_KEY: ${{ secrets.CATALOGO_SERVICO_API_KEY }}
+        run: bash scripts/deploy-k8s.sh
