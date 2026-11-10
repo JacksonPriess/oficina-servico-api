@@ -3,6 +3,7 @@ set -euo pipefail
 
 : "${DOCKER_IMAGE:?Configure DOCKER_IMAGE}"
 : "${CATALOGO_SERVICO_API_KEY:?Configure CATALOGO_SERVICO_API_KEY}"
+: "${NEW_RELIC_LICENSE_KEY:?Configure NEW_RELIC_LICENSE_KEY}"
 namespace="${K8S_NAMESPACE:-default}"
 
 if [[ -z "${CATALOGO_SERVICO_API_KEY//[[:space:]]/}" ]]; then
@@ -35,7 +36,25 @@ print(json.dumps({
 }))
 PY
 
-kubectl -n "$namespace" apply -f k8s/service.yaml
+# A licenca fica em um Secret separado da chave compartilhada do catalogo.
+python3 - <<'PYTHON' | kubectl -n "$namespace" apply --server-side -f -
+import base64
+import json
+import os
+
+license_key = os.environ["NEW_RELIC_LICENSE_KEY"]
+if not license_key.strip():
+    raise SystemExit("Configure NEW_RELIC_LICENSE_KEY antes do deploy.")
+print(json.dumps({
+    "apiVersion": "v1",
+    "kind": "Secret",
+    "metadata": {"name": "catalogo-servico-api-secret"},
+    "type": "Opaque",
+    "data": {"NEW_RELIC_LICENSE_KEY": base64.b64encode(license_key.encode()).decode()},
+}))
+PYTHON
+
+kubectl -n "$namespace" apply -f k8s/configmap.yaml -f k8s/service.yaml
 kubectl set image --local -f k8s/deployment.yaml catalogo-servico-api="$DOCKER_IMAGE" -o yaml \
   | kubectl -n "$namespace" apply -f -
 kubectl -n "$namespace" rollout status deployment/catalogo-servico-api-deployment --timeout=900s
