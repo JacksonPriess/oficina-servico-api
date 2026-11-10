@@ -1,16 +1,23 @@
-name: CI Catálogo de Serviços
+name: CI/CD Pipeline - Catálogo de Serviços
 
 on:
   pull_request:
-    branches: [main]
-  push:
-    branches: [main, feature/fase4]
+    branches:
+      - main
+
   workflow_dispatch:
+
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
 
 jobs:
+  # ============================================================
+  # CI
+  # ============================================================
   testes:
     runs-on: ubuntu-22.04
     services:
@@ -25,15 +32,22 @@ jobs:
       SERVICO_MONGO_INTEGRATION_TESTS: "true"
       MONGODB_URI: mongodb://localhost:27017/oficina_servicos_test
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 21
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
           cache: maven
-      - name: Testar e empacotar catálogo
+
+      - name: Executar testes e empacotar aplicação
         run: sh mvnw -B verify
 
+  # ============================================================
+  # CD
+  # ============================================================
   deploy:
     needs: testes
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
@@ -47,7 +61,9 @@ jobs:
       ECR_REPOSITORY: oficina-servico-dev-repo
       K8S_NAMESPACE: default
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
       - name: Configurar credenciais AWS
         uses: aws-actions/configure-aws-credentials@v6
         with:
@@ -55,19 +71,24 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
-      - name: Login no Amazon ECR
+
+      - name: Autenticar no Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-      - name: Publicar imagem no ECR
+
+      - name: Publicar imagem no Amazon ECR
         env:
           DOCKER_IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
         run: |
           docker build -t "$DOCKER_IMAGE" .
           docker push "$DOCKER_IMAGE"
+
       - name: Configurar acesso ao EKS
         run: aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
-      - name: Publicar catálogo de serviços
+
+      - name: Implantar no Amazon EKS
         env:
           DOCKER_IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
           CATALOGO_SERVICO_API_KEY: ${{ secrets.CATALOGO_SERVICO_API_KEY }}
+          NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
         run: bash scripts/deploy-k8s.sh
