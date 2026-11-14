@@ -75,3 +75,12 @@ SERVICO_MONGO_INTEGRATION_TESTS=true \
 MONGODB_URI=mongodb://localhost:27018/oficina_servicos_test \
 sh mvnw verify
 ```
+
+### Cobertura de Testes — Melhoria Futura
+
+Foi criado no `pom.xml` o perfil Maven `cobertura-80`, que permite validar uma cobertura mínima de **80% das linhas de código**, utilizando o JaCoCo.
+
+O perfil pode ser executado manualmente com o comando:
+
+```bash
+./mvnw clean verify -Pcobertura-80
